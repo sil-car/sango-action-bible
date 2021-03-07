@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Attempt to programmatically set language type by paragraph in the Action Bible English/Sango text.
+Attempt to programmatically set language type by paragraph in and ODT file.
 
 References:
 - https://sodocumentation.net/python/topic/479/manipulating-xml
@@ -174,14 +174,33 @@ def update_xml(xml_tree, language_words_dict):
 
     return xml_tree, results
 
+def print_summary(results):
+    """
+    Print summary statistics about number of paragraphs found for each language code.
+    """
+    total_p_ct = len(results)
+    blank_p_ct = len([r for r in results if r[1] == None])
+    sp = ' '*3
+    print(f"\n{total_p_ct} paragraphs in the document:\n{sp}{blank_p_ct} are empty")
+    p_ct_unknown = total_p_ct - blank_p_ct
+    p_ct_by_lang = {}
+    for lang_code in language_words_dict:
+        ct = len([r for r in results if r[1] == lang_code])
+        p_ct_by_lang[lang_code] = ct
+        p_ct_unknown -= ct
+        print(f"{sp}{ct} are {lang_code}")
+    print(f"{sp}{p_ct_unknown} are unknown.")
+
 def print_results(results, start=0, end=-1):
     """
     Print language code and initial paragraph text for the given range.
     """
     print()
+    total_p_ct = len(results)
+    #digit_ct = len(total_p_ct)
     for i, r in enumerate(results[start:end]):
         if r[1] is not None:
-            print(f"{i+1}. {r[1]}: {r[0]}")
+            print(f"{i+1+start}. {r[1]}: {r[0]}")
 
 
 # Define global variables.
@@ -237,18 +256,6 @@ tree, results = update_xml(tree, language_words_dict)
 # Write out the updated file.
 update_zip(outfile, 'content.xml', tree)
 
-# Print stats.
-total_p_ct = len(results)
-blank_p_ct = len([r for r in results if r[1] == None])
-sp = ' '*3
-print(f"\n{total_p_ct} paragraphs in the document:\n{sp}{blank_p_ct} are empty")
-p_ct_unknown = total_p_ct - blank_p_ct
-p_ct_by_lang = {}
-for lang_code in language_words_dict:
-    ct = len([r for r in results if r[1] == lang_code])
-    p_ct_by_lang[lang_code] = ct
-    p_ct_unknown -= ct
-    print(f"{sp}{ct} are {lang_code}")
-print(f"{sp}{p_ct_unknown} are unknown.")
-
-print_results(results, 10, 30)
+# Print summary data.
+print_summary(results)
+#print_results(results, start=10, end=30)
