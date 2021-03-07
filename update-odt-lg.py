@@ -17,6 +17,9 @@ from pathlib import Path
 
 
 def build_wordlist(dir, lang):
+    """
+    Create a word list from files whose filename matches the given language code.
+    """
     wordlist = []
     for f in dir.iterdir():
         if f.stem[:5] == lang:
@@ -32,7 +35,9 @@ def build_wordlist(dir, lang):
     return list(set(wordlist))
 
 def determine_language(words, language_words_dict, last_text_lang):
-
+    """
+    Match the language code of a list of words with one from the given dictionary.
+    """
     langs_by_word = []
     for word in words:
         # Count how many dictionaries the word is found in.
@@ -71,11 +76,14 @@ def determine_language(words, language_words_dict, last_text_lang):
         return possible_langs[0]
 
 
-def update_zip(file_zip, filename, tree):
-    # generate a temp file
+def update_zip(file_zip, filename, xml_tree):
+    """
+    Update a file in the given ODT ZIP file with data in the given XML tree.
+    """
+    # Generate a temp file.
     file_tmp = file_zip.with_suffix('.tmp')
 
-    # create a temp copy of the archive without filename
+    # Create a temp copy of the archive without filename.
     with zipfile.ZipFile(file_zip, 'r') as zin:
         with zipfile.ZipFile(file_tmp, 'w') as zout:
             zout.comment = zin.comment # preserve the comment
@@ -83,17 +91,19 @@ def update_zip(file_zip, filename, tree):
                 if item.filename != filename:
                     zout.writestr(item, zin.read(item.filename))
 
-    # replace with the temp archive
+    # Replace archive with the temp archive.
     Path.unlink(file_zip)
     Path.rename(file_tmp, file_zip)
 
-    # now add filename with its new data
-    #with zipfile.ZipFile(file_zip, mode='a', compression=zipfile.ZIP_DEFLATED) as zf:
-    with zipfile.ZipFile(file_zip, mode='a') as zf:
+    # Add filename with its new data.
+    with zipfile.ZipFile(file_zip, mode='a', compression=zipfile.ZIP_DEFLATED) as zf:
         with zf.open('content.xml', mode='w') as content_file:
-            tree.write(content_file)
+            xml_tree.write(content_file)
 
 def view_xml(xml_tree):
+    """
+    Show the values of the given XML tree.
+    """
     root = xml_tree.getroot()
     namespace = {
         'office': 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
@@ -112,16 +122,19 @@ def view_xml(xml_tree):
     #ET.dump(root)
 
 def update_xml(xml_tree, language_words_dict):
+    """
+    Update the paragraph styles of the given XML tree to include the given languages.
+    """
     root = xml_tree.getroot()
     intro_office = '{urn:oasis:names:tc:opendocument:xmlns:office:1.0}'
     intro_style = '{urn:oasis:names:tc:opendocument:xmlns:style:1.0}'
     intro_text = '{urn:oasis:names:tc:opendocument:xmlns:text:1.0}'
     intro_fo = '{urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0}'
     for part in root:
+        # Create new paragraph styles for each input language code.
         if part.tag == f"{intro_office}automatic-styles":
             for lang_code in language_words_dict:
                 [lg, CN] = lang_code.split('_')
-                # TODO: Generalize the paragraph styles for multiple languages.
                 p_style = ET.SubElement(part, f"{intro_style}style")
                 p_style.set(f"{intro_style}name", lang_code)
                 p_style.set(f"{intro_style}family", "paragraph")
@@ -131,17 +144,20 @@ def update_xml(xml_tree, language_words_dict):
                 p_text.set(f"{intro_fo}country", CN)
                 #p2_text.set('{http://openoffice.org/2009/office}paragraph-rsid': '00169b6b')
 
+        # Grab text from each paragraph and determine its language code.
         if part.tag == f"{intro_office}body":
             for paragraphs in part:
                 results = []
                 last_text_lang = None
                 ct = 0
                 for p in paragraphs:
-                    # Show progress dots: 1 for every 10 paragraphs.
+                    # Show progress dots: 1 for every X paragraphs.
                     ct += 1
                     if ct % 50 == 0:
                         sys.stdout.write('.')
                         sys.stdout.flush()
+
+                    # Determine language code of paragraph.
                     if p.attrib and p.text:
                         words = p.text.split()
                         first_words = ' '.join(words[:4])
@@ -153,10 +169,20 @@ def update_xml(xml_tree, language_words_dict):
                         first_words = None
 
                     last_text_lang = lang_code
-                    results.append([f"{first_words}...", lang_code])
+                    results.append([f"{first_words} ...", lang_code])
                 print()
 
     return xml_tree, results
+
+def print_results(results, start=0, end=-1):
+    """
+    Print language code and initial paragraph text for the given range.
+    """
+    print()
+    for i, r in enumerate(results[start:end]):
+        if r[1] is not None:
+            print(f"{i+1}. {r[1]}: {r[0]}")
+
 
 # Define global variables.
 infile = ''
@@ -184,7 +210,8 @@ else:
     exit(1)
 
 # Copy infile to outfile, asking for confirmation if it exists.
-outfile = infile.with_name(f"{infile.stem}-mod{infile.suffix}")
+langstr = f"__{'__'.join(languages)}"
+outfile = infile.with_name(f"{infile.stem}{langstr}{infile.suffix}")
 if outfile.is_file():
     answer = input(f"\n{outfile} already exists. Replace it? [Y/n]: ")
     try:
@@ -194,18 +221,17 @@ if outfile.is_file():
         # User hit [Enter] with no text. Accept default overwrite.
         pass
 
-# Make a copy of the infile.
 shutil.copyfile(infile, outfile)
 
-# Build wordlists.
-print(f"\nBuilding initial word lists for {', '.join(languages)}...")
+# Build word lists.
+print(f"\nBuilding word lists for {', '.join(languages)}...")
 language_words_dict = {}
 for lang_code in languages:
     language_words_dict[lang_code] = build_wordlist(dict_dir, lang_code)
     print(f"{lang_code}: {len(language_words_dict[lang_code])} words")
 
 # Update XML tree.
-print(f"\nEvaluating the language of each paragraph...")
+print(f"\nDetermining the language of each paragraph...")
 tree, results = update_xml(tree, language_words_dict)
 
 # Write out the updated file.
@@ -224,3 +250,5 @@ for lang_code in language_words_dict:
     p_ct_unknown -= ct
     print(f"{sp}{ct} are {lang_code}")
 print(f"{sp}{p_ct_unknown} are unknown.")
+
+print_results(results, 10, 30)
