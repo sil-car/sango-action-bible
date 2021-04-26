@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-'''
-Attempt to programmatically set language type by paragraph in and ODT file.
+"""Programmatically set language type by paragraph in and ODT file."""
 
-References:
-- https://sodocumentation.net/python/topic/479/manipulating-xml
-'''
+# References:
+#- https://sodocumentation.net/python/topic/479/manipulating-xml
 
 import shutil
 import sys
@@ -17,9 +15,7 @@ from pathlib import Path
 
 
 def build_wordlist(dir, lang):
-    """
-    Create a word list from files whose filename matches the given language code.
-    """
+    """Create a word list from files whose filename matches the given language code. """
     wordlist = []
     for f in dir.iterdir():
         if f.stem[:5] == lang:
@@ -35,9 +31,7 @@ def build_wordlist(dir, lang):
     return list(set(wordlist))
 
 def determine_language(words, language_words_dict, last_text_lang):
-    """
-    Match the language code of a list of words with one from the given dictionary.
-    """
+    """Match the language code of a list of words with one from the given dictionary."""
     langs_by_word = []
     for word in words:
         # Count how many dictionaries the word is found in.
@@ -77,9 +71,7 @@ def determine_language(words, language_words_dict, last_text_lang):
 
 
 def update_zip(file_zip, filename, xml_tree):
-    """
-    Update a file in the given ODT ZIP file with data in the given XML tree.
-    """
+    """Update a file in the given ODT ZIP file with data in the given XML tree."""
     # Generate a temp file.
     file_tmp = file_zip.with_suffix('.tmp')
 
@@ -101,9 +93,7 @@ def update_zip(file_zip, filename, xml_tree):
             xml_tree.write(content_file)
 
 def view_xml(xml_tree):
-    """
-    Show the values of the given XML tree.
-    """
+    """Show the values of the given XML tree."""
     root = xml_tree.getroot()
     namespace = {
         'office': 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
@@ -122,9 +112,7 @@ def view_xml(xml_tree):
     #ET.dump(root)
 
 def update_xml(xml_tree, language_words_dict):
-    """
-    Update the paragraph styles of the given XML tree to include the given languages.
-    """
+    """Update the paragraph styles of the given XML tree to include the given languages."""
     root = xml_tree.getroot()
     intro_office = '{urn:oasis:names:tc:opendocument:xmlns:office:1.0}'
     intro_style = '{urn:oasis:names:tc:opendocument:xmlns:style:1.0}'
@@ -175,9 +163,7 @@ def update_xml(xml_tree, language_words_dict):
     return xml_tree, results
 
 def print_summary(results):
-    """
-    Print summary statistics about number of paragraphs found for each language code.
-    """
+    """Print summary statistics about number of paragraphs found for each language code."""
     total_p_ct = len(results)
     blank_p_ct = len([r for r in results if r[1] == None])
     sp = ' '*3
@@ -192,9 +178,7 @@ def print_summary(results):
     print(f"{sp}{p_ct_unknown} are unknown.")
 
 def print_results(results, start=0, end=-1):
-    """
-    Print language code and initial paragraph text for the given range.
-    """
+    """Print language code and initial paragraph text for the given range."""
     print()
     total_p_ct = len(results)
     #digit_ct = len(total_p_ct)
