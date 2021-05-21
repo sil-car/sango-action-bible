@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-"""Programmatically set language type by paragraph in and ODT file."""
+"""Programmatically set language type by paragraph in an ODT file."""
 
 # References:
 #- https://sodocumentation.net/python/topic/479/manipulating-xml
 
+import re
 import shutil
+import string
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
@@ -16,7 +18,7 @@ from pathlib import Path
 
 def build_wordlist(dir, lang):
     """Create a word list from files whose filename matches the given language code. """
-    wordlist = []
+    wordlist = set()
     for f in dir.iterdir():
         if f.stem[:5] == lang:
             with open(f, 'r') as l:
@@ -25,50 +27,55 @@ def build_wordlist(dir, lang):
                     if not line:
                         continue
                     try:
-                        wordlist.append(line.split('/')[0].split()[0].strip())
+                        wordlist.add(line.split('/')[0].split()[0].strip())
                     except IndexError as e:
                         print(f"{repr(e)} for \"{line}\"")
-    return list(set(wordlist))
+    return wordlist
 
 def determine_language(words, language_words_dict, last_text_lang):
-    """Match the language code of a list of words with one from the given dictionary."""
-    langs_by_word = []
-    for word in words:
-        # Count how many dictionaries the word is found in.
-        valid_langs = []
-        for lang_code, wordlist in language_words_dict.items():
-            if word.lower() in wordlist:
-                #print(f"{language} is valid for {word}")
-                valid_langs.append(lang_code)
-        if len(valid_langs) == 1:
-            #print(f"Only one valid language for \"{word}\": {valid_langs[0]}.")
-            return valid_langs[0]
-        elif len(valid_langs) > 1:
-            langs_by_word.append(valid_langs)
-    if len(langs_by_word) == 0:
-        # No language could be identified for any words in text.
-        #print("No language found for this text.")
-        return last_text_lang if last_text_lang else None
-    # Every word is found in multiple languages.
-    possible_langs = []
-    for lang_codes in langs_by_word:
-        if len(possible_langs) == 0:
-            # First word in text.
-            possible_langs = lang_codes
-        # Subsequent words in text.
-        for possible_lang in possible_langs:
-            if possible_lang not in lang_codes:
-                possible_langs.remove(possible_lang)
-                if len(possible_langs) == 1:
-                    #print(f"Only remaining possible language is {possible_langs[0]}")
-                    return possible_langs[0]
-    # Return the previous language if not None and in list of possibilities.
-    if last_text_lang and last_text_lang in possible_langs:
-        return last_text_lang
+    lang_code = ''
+    regex_punctuation = re.compile(f'[{re.escape(string.punctuation)}]')
+    word_counts_by_lg = count_occurrences_by_lg(words, language_words_dict, regex_punctuation)
+    total_words = word_counts_by_lg.pop('words')
+    max_count = max(word_counts_by_lg.values())
+    lang_codes = []
+    for lg, count in word_counts_by_lg.items():
+        if count == max_count:
+            lang_codes.append(lg)
+    lc_length = len(lang_codes)
+    if lc_length == 0 or total_words == 0:
+        lang_code = last_text_lang
+    elif lc_length == 1:
+        lang_code = lang_codes[0]
     else:
-        # Otherwise just return 1st language in list of possibilities.
-        return possible_langs[0]
+        # Multiple matches.
+        if total_words == 1:
+            # One word that matches multiple languages. No way to tell for sure
+            #   which language is correct. Default to last_text_lang.
+            lang_code = last_text_lang
+        else:
+            # Default to 'en_US' if matched, or just pick first match.
+            if 'en_US' in lang_codes:
+                lang_code = 'en_US'
+            else:
+                lang_code = lang_codes[0]
+    return lang_code
 
+def count_occurrences_by_lg(text_words, wordlists, regex):
+    # wordlists is a dict: {'lg': {*words}}
+    counts = {}
+    counts['words'] = 0
+    for lang_code in wordlists.keys():
+        counts[lang_code] = 0
+    for t in text_words:
+        counts['words'] += 1
+        t = regex.sub('', t.lower()) # remove punctuation
+        for lang_code, lg_words in wordlists.items():
+            if re.match(r'.*[0-9]+.*', t): # includes digits
+                counts[lang_code] += 1
+            elif t in lg_words:
+                counts[lang_code] += 1
+    return counts
 
 def update_zip(file_zip, filename, xml_tree):
     """Update a file in the given ODT ZIP file with data in the given XML tree."""
@@ -118,6 +125,7 @@ def update_xml(xml_tree, language_words_dict):
     intro_style = '{urn:oasis:names:tc:opendocument:xmlns:style:1.0}'
     intro_text = '{urn:oasis:names:tc:opendocument:xmlns:text:1.0}'
     intro_fo = '{urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0}'
+
     for part in root:
         # Create new paragraph styles for each input language code.
         if part.tag == f"{intro_office}automatic-styles":
@@ -140,8 +148,9 @@ def update_xml(xml_tree, language_words_dict):
                 ct = 0
                 for p in paragraphs:
                     # Show progress dots: 1 for every X paragraphs.
+                    x = 50
                     ct += 1
-                    if ct % 50 == 0:
+                    if ct % x == 0:
                         sys.stdout.write('.')
                         sys.stdout.flush()
 
@@ -159,7 +168,6 @@ def update_xml(xml_tree, language_words_dict):
                     last_text_lang = lang_code
                     results.append([f"{first_words} ...", lang_code])
                 print()
-
     return xml_tree, results
 
 def print_summary(results):
