@@ -54,14 +54,14 @@ def get_hs_dics(dir, lang_codes):
     return hs_dics
 
 def count_occurrences_by_lg(text_words, regex, hs_dics):
-    # wordlists is a dict: {'lg': {*words}}
     counts = {}
     counts['words'] = 0
     for lang_code in hs_dics.keys():
         counts[lang_code] = 0
     for t in text_words:
         counts['words'] += 1
-        t = regex.sub('', t.lower()) # remove punctuation
+        # t = regex.sub('', t.lower()) # remove punctuation
+        t = t.lower()
         # for lang_code, lg_words in wordlists.items():
         #     if re.match(r'.*[0-9]+.*', t): # includes digits
         #         counts[lang_code] += 1
@@ -123,16 +123,20 @@ def update_xml(xml_tree, hs_dics):
     intro_text = '{urn:oasis:names:tc:opendocument:xmlns:text:1.0}'
     intro_fo = '{urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0}'
 
+    # print("All p's:")
+    # for i in root.findall(f'./{intro_office}body/{intro_text}p'):
+    # for i in root.findall(f'./{intro_office}body'):
+    #     print(i)
     for part in root:
         # Create new paragraph styles for each input language code.
         if part.tag == f"{intro_office}automatic-styles":
-            # for lang_code in language_words_dict:
             for lang_code in hs_dics.keys():
                 [lg, CN] = lang_code.split('_')
                 p_style = ET.SubElement(part, f"{intro_style}style")
                 p_style.set(f"{intro_style}name", lang_code)
                 p_style.set(f"{intro_style}family", "paragraph")
-                p_style.set(f"{intro_style}parent-style-name", "Preformatted_20_Text")
+                # p_style.set(f"{intro_style}parent-style-name", "Preformatted_20_Text")
+                p_style.set(f"{intro_style}parent-style-name", "Standard")
                 p_text = ET.SubElement(p_style, f"{intro_style}text-properties")
                 p_text.set(f"{intro_fo}language", lg)
                 p_text.set(f"{intro_fo}country", CN)
@@ -153,13 +157,20 @@ def update_xml(xml_tree, hs_dics):
                         sys.stdout.flush()
 
                     # Determine language code of paragraph.
-                    if p.attrib and p.text:
+                    # if p.attrib and p.text:
+                    # TODO: First line of each page is not recognized.
+                    if p.text:
                         words = p.text.split()
                         first_words = ' '.join(words[:4])
                         lang_code = determine_language(words, last_text_lang, hs_dics)
                         if lang_code:
                             p.set(f"{intro_text}style-name", lang_code)
                     else:
+                        # print(dir(p))
+                        # print(p.tag)
+                        # print(p.items)
+                        # print(p.getchildren())
+                        # exit()
                         lang_code = None
                         first_words = None
 
