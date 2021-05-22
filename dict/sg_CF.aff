@@ -1,0 +1,20 @@
+
+SET UTF-8
+
+IGNORE -
+
+ICONV 14
+ICONV è è
+ICONV î î
+ICONV é é
+ICONV ï ï
+ICONV ë ë
+ICONV ö ö
+ICONV ç ç
+ICONV û û
+ICONV ä ä
+ICONV â â
+ICONV ê ê
+ICONV ô ô
+ICONV ü ü
+ICONV à à

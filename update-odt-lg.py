@@ -15,27 +15,13 @@ import zipfile
 
 from pathlib import Path
 
+import hs
 
-def build_wordlist(dir, lang):
-    """Create a word list from files whose filename matches the given language code. """
-    wordlist = set()
-    for f in dir.iterdir():
-        if f.stem[:5] == lang:
-            with open(f, 'r') as l:
-                for line in l.readlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        wordlist.add(line.split('/')[0].split()[0].strip())
-                    except IndexError as e:
-                        print(f"{repr(e)} for \"{line}\"")
-    return wordlist
 
-def determine_language(words, language_words_dict, last_text_lang):
+def determine_language(words, last_text_lang, hs_dics):
     lang_code = ''
     regex_punctuation = re.compile(f'[{re.escape(string.punctuation)}]')
-    word_counts_by_lg = count_occurrences_by_lg(words, language_words_dict, regex_punctuation)
+    word_counts_by_lg = count_occurrences_by_lg(words, regex_punctuation, hs_dics)
     total_words = word_counts_by_lg.pop('words')
     max_count = max(word_counts_by_lg.values())
     lang_codes = []
@@ -61,19 +47,30 @@ def determine_language(words, language_words_dict, last_text_lang):
                 lang_code = lang_codes[0]
     return lang_code
 
-def count_occurrences_by_lg(text_words, wordlists, regex):
+def get_hs_dics(dir, lang_codes):
+    hs_dics = {}
+    for lc in lang_codes:
+        hs_dics[lc] = hs.get_hs_dic(dir, lc)
+    return hs_dics
+
+def count_occurrences_by_lg(text_words, regex, hs_dics):
     # wordlists is a dict: {'lg': {*words}}
     counts = {}
     counts['words'] = 0
-    for lang_code in wordlists.keys():
+    for lang_code in hs_dics.keys():
         counts[lang_code] = 0
     for t in text_words:
         counts['words'] += 1
         t = regex.sub('', t.lower()) # remove punctuation
-        for lang_code, lg_words in wordlists.items():
-            if re.match(r'.*[0-9]+.*', t): # includes digits
-                counts[lang_code] += 1
-            elif t in lg_words:
+        # for lang_code, lg_words in wordlists.items():
+        #     if re.match(r'.*[0-9]+.*', t): # includes digits
+        #         counts[lang_code] += 1
+        #     elif t in lg_words:
+        #         counts[lang_code] += 1
+        for lang_code, d in hs_dics.items():
+            if not d:
+                pass
+            elif hs.lookup_word(d, t):
                 counts[lang_code] += 1
     return counts
 
@@ -118,7 +115,7 @@ def view_xml(xml_tree):
     print(auto_styles.tag, auto_styles.attrib)
     #ET.dump(root)
 
-def update_xml(xml_tree, language_words_dict):
+def update_xml(xml_tree, hs_dics):
     """Update the paragraph styles of the given XML tree to include the given languages."""
     root = xml_tree.getroot()
     intro_office = '{urn:oasis:names:tc:opendocument:xmlns:office:1.0}'
@@ -129,7 +126,8 @@ def update_xml(xml_tree, language_words_dict):
     for part in root:
         # Create new paragraph styles for each input language code.
         if part.tag == f"{intro_office}automatic-styles":
-            for lang_code in language_words_dict:
+            # for lang_code in language_words_dict:
+            for lang_code in hs_dics.keys():
                 [lg, CN] = lang_code.split('_')
                 p_style = ET.SubElement(part, f"{intro_style}style")
                 p_style.set(f"{intro_style}name", lang_code)
@@ -158,7 +156,7 @@ def update_xml(xml_tree, language_words_dict):
                     if p.attrib and p.text:
                         words = p.text.split()
                         first_words = ' '.join(words[:4])
-                        lang_code = determine_language(words, language_words_dict, last_text_lang)
+                        lang_code = determine_language(words, last_text_lang, hs_dics)
                         if lang_code:
                             p.set(f"{intro_text}style-name", lang_code)
                     else:
@@ -178,7 +176,7 @@ def print_summary(results):
     print(f"\n{total_p_ct} paragraphs in the document:\n{sp}{blank_p_ct} are empty")
     p_ct_unknown = total_p_ct - blank_p_ct
     p_ct_by_lang = {}
-    for lang_code in language_words_dict:
+    for lang_code in hs_dics.keys():
         ct = len([r for r in results if r[1] == lang_code])
         p_ct_by_lang[lang_code] = ct
         p_ct_unknown -= ct
@@ -234,16 +232,20 @@ if outfile.is_file():
 
 shutil.copyfile(infile, outfile)
 
-# Build word lists.
-print(f"\nBuilding word lists for {', '.join(languages)}...")
-language_words_dict = {}
-for lang_code in languages:
-    language_words_dict[lang_code] = build_wordlist(dict_dir, lang_code)
-    print(f"{lang_code}: {len(language_words_dict[lang_code])} words")
+# # Build word lists.
+# print(f"\nBuilding word lists for {', '.join(languages)}...")
+# language_words_dict = {}
+# for lang_code in languages:
+#     # Build word lists.
+#     language_words_dict[lang_code] = hs.build_wordlist(dict_dir, lang_code)
+#     print(f"{lang_code}: {len(language_words_dict[lang_code])} words")
+
+# Get hunspell dictionaries.
+hs_dics = get_hs_dics(dict_dir, languages)
 
 # Update XML tree.
 print(f"\nDetermining the language of each paragraph...")
-tree, results = update_xml(tree, language_words_dict)
+tree, results = update_xml(tree, hs_dics)
 
 # Write out the updated file.
 update_zip(outfile, 'content.xml', tree)
