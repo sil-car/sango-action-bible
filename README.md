@@ -1,6 +1,6 @@
-# change-lg-odt
+# sang-action-bible
 
-Use word lists to properly mark English and Sango paragraphs as such using LibreOffice Styles.
+This is a collection of scripts written to aid SIL CAR's checking of the Sango Action Bible, originally drafted by someone else. The draft text was ultimately converted into Paratext project files.
 
 Requres:
 ```bash
