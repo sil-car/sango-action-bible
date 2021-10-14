@@ -5,9 +5,18 @@ lang="$2"
 if [[ -z $2 ]]; then
     lang="Sango"
 fi
-# outfile="${infile%.*}.sfm"
-outfile="${HOME}/Paratext8Projects/SAB/94XXASAB.SFM"
 
+# Set output file name and path.
+if [[ "$lang" == 'Sango' ]]; then
+    name="SAB"
+    filename="94XXA${name}.SFM"
+elif [[ "$lang" == 'English' ]]; then
+    name="EAB"
+    filename="94XXA${name}.SFM"
+fi
+outfile="${HOME}/Paratext8Projects/${name}/${filename}"
+
+# Get contents of input file.
 contents=$(cat "$infile")
 
 # Add ID.
@@ -39,13 +48,17 @@ contents=$(cat "$temp")
 
 # Add paragraph markers.
 temp="${temp}p"
-echo "$contents" | sed -r 's/^[^\\]/\\p /' > "$temp"
+echo "$contents" | sed -r 's/^([^\\])/\\p \1/' > "$temp"
 contents=$(cat "$temp")
 
 # Write out final file.
-read -p "Are you sure you want to overwrite the current $outfile? [N/y]" ans
-if [[ "$ans" ==  'y' ]] || [[ "$ans" == 'Y' ]]; then
-    echo "$contents" > "$outfile"
+if [[ -e "$outfile" ]]; then
+    read -p "Are you sure you want to overwrite the current $outfile? [y/N]: " ans
+    if [[ "$ans" ==  'y' ]] || [[ "$ans" == 'Y' ]]; then
+        echo "$contents" > "$outfile"
+    else
+        echo "$outfile not overwritten."
+    fi
 else
-    echo "$outfile not overwritten."
+    echo "$contents" > "$outfile"
 fi
