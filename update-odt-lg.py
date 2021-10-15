@@ -83,6 +83,7 @@ def update_autostyles(doc, lang_codes):
             family="paragraph",
         )
         pstyle.addElement(TextProperties(language=lg, country=CN))
+        doc.automaticstyles.addElement(pstyle)
     return doc
 
 def update_paragraphs_styles(doc, hs_dics):
@@ -198,7 +199,7 @@ def main():
 
     # Print summary data.
     print_summary(results, hs_dics)
-    #print_results(results, hs_dics, start=10, end=30)
+    # print_results(results, hs_dics, start=0, end=-1)
 
 
 if __name__ == '__main__':
