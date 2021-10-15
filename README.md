@@ -2,7 +2,7 @@
 
 This is a collection of scripts written to aid SIL CAR's checking of the Sango Action Bible, originally drafted by someone else. The draft text was ultimately converted into Paratext project files.
 
-Requres:
+Requires:
 ```bash
 $ sudo apt install python3-dev libhunspell-dev
 ```
