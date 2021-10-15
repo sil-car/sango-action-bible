@@ -1,18 +1,24 @@
 #!/bin/env bash
 
 infile="$1"
-lang="$2"
-if [[ -z $2 ]]; then
-    lang="Sango"
+# Infile should end like this: _en-US_clean.txt.
+if [[ "${infile: -16}" != '_en-US_clean.txt' ]] && [[ "${infile: -16}" != '_sg-CF_clean.txt' ]]; then
+    echo "Error: file name should end with \"_en-US_clean.txt\""
+    exit 1
 fi
+stem="${infile%.txt}"
+part="${stem%_*}"
+lang="${part##*_}"
 
 # Set output file name and path.
-if [[ "$lang" == 'Sango' ]]; then
+if [[ "$lang" == 'sg-CF' ]]; then
     name="SAB"
     filename="94XXA${name}.SFM"
-elif [[ "$lang" == 'English' ]]; then
+    panel="Kapa"
+elif [[ "$lang" == 'en-US' ]]; then
     name="EAB"
     filename="94XXA${name}.SFM"
+    panel="Panel"
 fi
 outfile="${HOME}/Paratext8Projects/${name}/${filename}"
 
@@ -35,14 +41,6 @@ contents=$(cat "$temp")
 
 # Add verse markers.
 temp="${temp}v"
-if [[ "$lang" == "Sango" ]]; then
-    panel="Kapa"
-elif [[ "$lang" == "English" ]]; then
-    panel="Panel"
-else
-    echo "Error: unsupported language $lang"
-    exit 1
-fi
 echo "$contents" | sed -r 's/'"$panel"'\s*([0-9]+)/\\v \1/' > "$temp"
 contents=$(cat "$temp")
 
