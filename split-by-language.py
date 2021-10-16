@@ -26,16 +26,23 @@ def get_paragraphs(doc):
     paragraphs = []
     for p in doc.body.getElementsByType(P):
         # Get text of each paragraph.
-        words = ''
+        words = []
         for n in p.childNodes:
             try:
-                words += f" {n.data}"
+                words.extend(n.data.split())
             except AttributeError:
                 pass
         paragraphs.append(words)
     return paragraphs
 
-def determine_language(words, last_text_lang, hs_dics):
+def get_lines(text_file):
+    with open(text_file) as f:
+        lines = f.readlines()
+    # Strip newlines.
+    lines = [p.strip().split() for p in lines[:]]
+    return lines
+
+def determine_language(words, hs_dics, default_lang):
     lang_code = ''
     regex_punctuation = re.compile(f'[{re.escape(string.punctuation)}]')
     word_counts_by_lg = count_occurrences_by_lg(words, regex_punctuation, hs_dics)
@@ -47,21 +54,21 @@ def determine_language(words, last_text_lang, hs_dics):
             lang_codes.append(lg)
     lc_length = len(lang_codes)
     if lc_length == 0 or total_words == 0:
-        lang_code = last_text_lang
+        lang_code = None
     elif lc_length == 1:
         lang_code = lang_codes[0]
     else:
         # Multiple matches.
         if total_words == 1:
             # One word that matches multiple languages. No way to tell for sure
-            #   which language is correct. Default to last_text_lang.
-            lang_code = last_text_lang
+            #   which language is correct. Default to first language code.
+            lang_code = default_lang
         else:
             # Default to 'en_US' if matched, or just pick first match.
             if 'en_US' in lang_codes:
                 lang_code = 'en_US'
             else:
-                lang_code = lang_codes[0]
+                lang_code = default_lang
     return lang_code
 
 def get_hs_dics(dir, lang_codes):
@@ -120,6 +127,7 @@ def main():
     infile = ''
     outfile = ''
     languages = ['en_US', 'fr_FR', 'sg_CF']
+    default_lang = languages[0]
     repo_root = Path(__file__).resolve().parents[0]
     dict_dir = repo_root / 'dict'
 
@@ -141,6 +149,7 @@ def main():
     # Create outfiles dictionary.
     languages.append('unknown')
     outfiles = {l: infile.with_name(f"{infile.stem}_{l}.txt") for l in languages}
+    outtext = {l: [] for l in languages}
 
     # Get hunspell dictionaries.
     hs_dics = get_hs_dics(dict_dir, languages)
@@ -156,30 +165,33 @@ def main():
         file_type = 'TXT'
         unit = 'line'
         end = '\n'
-        with open(infile) as f:
-            parts = f.readlines()
+        parts = get_lines(infile)
     else:
         print("Error: not an ODT or TXT file.")
         exit(1)
 
-    # print(f"\nDetermining the language of each {unit}...")
-    for f in outfiles.values():
-        if f.is_file():
-            # Delete existing file's contents.
-            f.write_text('')
-    for part in parts:
-        if not part:
+    # Determine the language of each unit.
+    results = []
+    for words in parts:
+        if not words:
             continue
-        last_lang = None
-        lang_code = determine_language(part, last_lang, hs_dics)
+        # print(words)
+        first_words = ' '.join(words[:4])
+        # last_lang = None
+        lang_code = determine_language(words, hs_dics, default_lang)
         if not lang_code:
             lang_code = 'unknown'
-        with outfiles[lang_code].open(mode='a', newline='\n') as f:
-            f.write(f"{part}")
+        outtext[lang_code].append(' '.join(words))
+        results.append([f"{first_words} ...", lang_code])
+
+    # Write outtext to outfiles.
+    for l, f in outfiles.items():
+        if outtext[l]:
+            f.write_text('\n'.join(outtext[l]))
 
     # Print summary data.
-    # print_summary(results, hs_dics)
     # print_results(results, hs_dics, start=0, end=-1)
+    print_summary(results, hs_dics)
 
 
 if __name__ == '__main__':
