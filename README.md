@@ -1,4 +1,4 @@
-# sang-action-bible
+# sango-action-bible
 
 This is a collection of scripts written to aid SIL CAR's checking of the Sango Action Bible, originally drafted by someone else. The draft text was ultimately converted into Paratext project files.
 
