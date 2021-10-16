@@ -34,11 +34,13 @@ replace '[0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}.*$'
 # Remove all xxx### markers.
 replace 'xxx[0-9]+\s*\n'
 
+# COMMENTED OUT B/C WANTED TO PRESERVE THESE ARTIFACTS.
 # Remove lines that are only all-caps and/or spaces.
-replace '^[A-Z ]+$'
+# replace '^[A-Z ]+$'
 
+# COMMENTED OUT B/C TOO GREEDY.
 # Remove "TO EXODUS 32" (A-Z, 0-9, ' '; 5 or more characters).
-replace '[A-Z0-9 ]{5,}'
+# replace '[A-Z0-9 ]{5,}'
 
 # Fix out-of-order chapter 254.
 replace_nth_occurrance 2 'P254' 'P750'
