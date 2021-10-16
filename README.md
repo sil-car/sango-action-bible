@@ -9,21 +9,21 @@ $ sudo apt install python3-dev libhunspell-dev
 
 ### Conversion from ODT to SFM
 
-#### Clean up ODT file and convert to TXT files. [30 min]
+#### Clean up ODT file and convert to TXT files. [28 min]
 
-- Download ODT from Drive. [5 min]
+- Download ODT from Drive. [2 min]
 - Move to Sango Action Bible folder; rename to add current date. [1 min]
-- Open ODT and turn off Track Changes tracking & visibility; re-save & close. [10 min]
-- Move text to new ODT "no-tracked-changes" file to remove tracked changes: New > Insert text from document... [2 min]
+- Open ODT and turn off Track Changes tracking & visibility; re-save & close. [15 min]
+- Move text to new ODT "no-tracked-changes" file to remove tracked changes: New > Insert text from document... [3 min]
 - Use update-odt-lg.py to fix paragraphs that are marked with the incorrect language. [1 min]
 - Export comments?
 - Copy file and rename by adding _en-US. [1 min]
 - Copy file and rename by adding _sg-CF. [1 min]
-- en-US file: [5 min]
+- en-US file: [2 min]
   - Use Find/Replace to change language of P### paragraphs to English: ```^\s*[pP][0-9]{2,3}```.
   - Use Find/Replace to select all French and Sango text and remove with Backspace.
   - Save As TXT file.
-- sg-CF file: [5 min]
+- sg-CF file: [2 min]
   - Use Find/Replace to change language of P### paragraphs to Sango: ```^\s*[pP][0-9]{2,3}```.
   - Use Find/Replace to select and remove all French and English text.
   - Save As TXT file.
