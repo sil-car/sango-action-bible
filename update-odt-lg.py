@@ -79,9 +79,6 @@ def update_paragraphs_styles(doc, hs_dics):
             sys.stdout.write('.')
             sys.stdout.flush()
 
-        # Extract comments to XML file.
-        p = extract_comments(p)
-
         # Determine language code of paragraph.
         words = []
         for n in p.childNodes:
@@ -102,60 +99,6 @@ def update_paragraphs_styles(doc, hs_dics):
         results.append([f"{first_words} ...", lang_code])
     print()
     return doc, results
-
-def extract_comments(paragraph):
-    # Need to parse out:
-    #   + PT User as "User"
-    #   - reference as "VerseRef"
-    #   + timestamp as "Date"
-
-    #   - SelectedText
-    #   - StartPosition
-
-    # Optional?
-    #   - ContextBefore
-    #   - ContextAfter
-
-    #   + ConflictType = unknownConflictType
-    #   - Verse
-    #   + HideInTextWindow = false
-    #   + comment as "Contents"
-
-    # print(f"\n{paragraph}")
-    for i, c in enumerate(paragraph.childNodes):
-        print(i, c.tagName)
-        if c.tagName == 'office:annotation':
-            user = c.childNodes[0]
-            date = c.childNodes[1]
-            initials = c.childNodes[2]
-            contents = c.childNodes[3]
-
-            attribs = [
-                'attributes',
-                'childNodes',
-                'data',
-                'qname',
-                'tagName',
-            ]
-            for a in attribs:
-                print(f"{a}: {c.__dict__.get(a)}")
-            if c.childNodes:
-                print('childNodes:')
-                for n in c.childNodes:
-                    print(n)
-
-            if c.attributes:
-                for k, v in c.attributes.items():
-                    if c.qname[1] == 'annotation':
-                        # print(c.attributes)
-                        # print(c)
-                        # comment_text = c
-                        author = ''
-                    elif c.qname[1] == 'annotation-end':
-                        pass
-                        # print(c.attributes)
-                        # print(c)
-    return paragraph
 
 def print_summary(results, hs_dics):
     """
