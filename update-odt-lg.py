@@ -7,18 +7,14 @@ Programmatically set language type by paragraph in an ODT file.
 # References:
 #   https://github.com/eea/odfpy/wiki
 
+import hs
+import odfutils
 import re
 import shutil
 import string
 import sys
 
-from odf.opendocument import load
-from odf.opendocument import OpenDocumentText
-from odf.style import Style, TextProperties
-from odf.text import P
 from pathlib import Path
-
-import hs
 
 
 def determine_language(words, last_text_lang, hs_dics):
@@ -71,32 +67,20 @@ def count_occurrences_by_lg(text_words, regex, hs_dics):
                 counts[lang_code] += 1
     return counts
 
-def update_autostyles(doc, lang_codes):
-    """
-    Update The automatic paragraph styles of the given ODT document to include
-    the given languages.
-    """
-    for lang_code in lang_codes:
-        [lg, CN] = lang_code.split('_')
-        pstyle = Style(
-            name=lang_code,
-            family="paragraph",
-        )
-        pstyle.addElement(TextProperties(language=lg, country=CN))
-        doc.automaticstyles.addElement(pstyle)
-    return doc
-
 def update_paragraphs_styles(doc, hs_dics):
     results = []
     last_text_lang = None
     ct = 0
-    for p in doc.body.getElementsByType(P):
+    for p in doc.body.getElementsByType(odfutils.P):
         # Show progress dots: 1 for every X paragraphs.
         x = 50
         ct += 1
         if ct % x == 0:
             sys.stdout.write('.')
             sys.stdout.flush()
+
+        # Extract comments to XML file.
+        p = extract_comments(p)
 
         # Determine language code of paragraph.
         words = []
@@ -118,6 +102,60 @@ def update_paragraphs_styles(doc, hs_dics):
         results.append([f"{first_words} ...", lang_code])
     print()
     return doc, results
+
+def extract_comments(paragraph):
+    # Need to parse out:
+    #   + PT User as "User"
+    #   - reference as "VerseRef"
+    #   + timestamp as "Date"
+
+    #   - SelectedText
+    #   - StartPosition
+
+    # Optional?
+    #   - ContextBefore
+    #   - ContextAfter
+
+    #   + ConflictType = unknownConflictType
+    #   - Verse
+    #   + HideInTextWindow = false
+    #   + comment as "Contents"
+
+    # print(f"\n{paragraph}")
+    for i, c in enumerate(paragraph.childNodes):
+        print(i, c.tagName)
+        if c.tagName == 'office:annotation':
+            user = c.childNodes[0]
+            date = c.childNodes[1]
+            initials = c.childNodes[2]
+            contents = c.childNodes[3]
+
+            attribs = [
+                'attributes',
+                'childNodes',
+                'data',
+                'qname',
+                'tagName',
+            ]
+            for a in attribs:
+                print(f"{a}: {c.__dict__.get(a)}")
+            if c.childNodes:
+                print('childNodes:')
+                for n in c.childNodes:
+                    print(n)
+
+            if c.attributes:
+                for k, v in c.attributes.items():
+                    if c.qname[1] == 'annotation':
+                        # print(c.attributes)
+                        # print(c)
+                        # comment_text = c
+                        author = ''
+                    elif c.qname[1] == 'annotation-end':
+                        pass
+                        # print(c.attributes)
+                        # print(c)
+    return paragraph
 
 def print_summary(results, hs_dics):
     """
@@ -168,7 +206,7 @@ def main():
     if infile.is_file() and infile.suffix == '.odt':
         infile = infile.resolve()
         # Load content.
-        doc = load(infile)
+        doc = odfutils.load_doc(infile)
     else:
         print("Error: Input file does not exist.")
         exit(1)
@@ -191,7 +229,7 @@ def main():
 
     # Update XML tree.
     print(f"\nDetermining the language of each paragraph...")
-    doc = update_autostyles(doc, hs_dics.keys())
+    doc = odfutils.update_autostyles(doc, hs_dics.keys())
     doc, results = update_paragraphs_styles(doc, hs_dics)
 
     # Write out the updated file.
