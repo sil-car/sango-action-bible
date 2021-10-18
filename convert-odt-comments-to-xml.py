@@ -63,8 +63,6 @@ def extract_comments(doc, book):
     v_pat_bytes = re.compile(v_pat)
     chapter = 0
     verse = 1
-    verse_text = []
-    # is_comment = False
     comment_count = 0
     ct = 0
     for p in doc.body.getElementsByType(odfutils.P):
@@ -84,7 +82,6 @@ def extract_comments(doc, book):
         if v_match:
             verse = int(v_match.group().replace('Panel', '', 1).replace('Panel ', '', 1))
             doc_content[chapter][verse] = []
-            verse_text = [] # reset verse_text
 
         if has_comment(p):
             # Get list of all comments in paragraph.
@@ -156,11 +153,9 @@ def extract_comments(doc, book):
                     )
                     prev_comment = i
 
-            verse_text.extend(pwords)
             doc_content[chapter][verse].extend(pwords)
 
         else:
-            verse_text.extend(ptext.split())
             doc_content[chapter][verse].extend(ptext.split())
 
     return comments, doc_content, comment_count
@@ -187,7 +182,6 @@ def main():
         file_name = f"Notes_{user}.xml"
         outfile = infile.with_name(file_name)
         outfile.write_text(xml)
-        # print(xml)
 
 if __name__ == '__main__':
     main()
