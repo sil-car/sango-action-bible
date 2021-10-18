@@ -75,6 +75,10 @@ def extract_comments(doc, book):
         ptext = convert_to_sfm(str(p), ch_pat_bytes, v_pat_bytes)
         if ch_match:
             chapter = int(ch_match.group().replace('P', '', 1).replace('p', '', 1))
+            if chapter == 317 or chapter == 318:
+                chapter += 2
+            elif chapter == 748:
+                chapter += 1
             verse = 1
             doc_content[chapter] = {verse: []}
         if v_match:
