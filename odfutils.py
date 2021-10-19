@@ -2,7 +2,7 @@
 
 from odf.opendocument import load
 from odf.style import Style, TextProperties
-from odf.text import P
+from odf.text import A, H, P, S
 
 
 def load_doc(infile):
