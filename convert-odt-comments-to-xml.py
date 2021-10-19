@@ -30,12 +30,13 @@ def verify_infile_as_arg(script_args):
 
     return infile
 
-def has_comment(paragraph):
-    status = False
-    for c in paragraph.childNodes:
+def has_comment(node):
+    for c in node.childNodes:
         if c.tagName == 'office:annotation':
-            status = True
-    return status
+            return True
+        if has_comment(c):
+            return True
+    return False
 
 def get_verse_text(doc_content, ref):
     chapter, verse = ref.split()[1].split(':')
@@ -52,6 +53,90 @@ def convert_to_sfm(text, ch_pat_bytes, v_pat_bytes):
     if is_verse:
         text = text.replace('Panel', '\\v ', 1)
     return(text)
+
+def get_paragraph_comment_list(paragraph, comment_count, p_comments):
+    # Get list of all comments in paragraph by index.
+    for i, c in enumerate(paragraph.childNodes):
+        if c.tagName == 'office:annotation':
+            p_comments.append(i)
+            comment_count += 1
+    return comment_count, p_comments
+
+def append_comment(comment_count, comments, paragraph, verse_ref, doc_content):
+    # Get list of all comments in paragraph.
+    p_comments = []
+    comment_count, p_comments = get_paragraph_comment_list(paragraph, comment_count, p_comments)
+
+    for i, c in enumerate(paragraph.childNodes):
+        pwords = []
+        context_before = []
+        context_after = []
+        prev_comment = 0
+        next_comment = -1
+        if c.tagName == 'office:annotation':
+            # Determine indexes of prev and next comments.
+            for j, k in enumerate(p_comments):
+                if k == i:
+                    if len(p_comments) >= 1 + j + 1:
+                        next_comment = p_comments[j + 1]
+                    if j > 0:
+                        prev_comment = p_comments[j - 1]
+
+            # Determine context before comment.
+            context_before = []
+            for n in paragraph.childNodes[prev_comment:i]:
+                context_before.extend(str(n).split())
+            selected_text = ''
+
+            # Determine end of comment selection.
+            comment_end = i # if there's no selected text
+            if len(paragraph.childNodes) >= 1 + i + 2:
+                if paragraph.childNodes[i + 2].tagName == 'office:annotation-end':
+                    # Next child node has selected text.
+                    selected_text = str(paragraph.childNodes[i + 1])
+                    comment_end = i + 2
+
+            # Determine context after comment.
+            context_after = []
+            for n in paragraph.childNodes[comment_end + 1:next_comment]:
+                context_after.extend(str(n).split())
+
+            # Set paragraph words according to context and selected text.
+            pwords = context_before + selected_text.split() + context_after
+            user = str(c.childNodes[0])
+            if comments.get(user) is None:
+                comments[user] = []
+
+            date = str(c.childNodes[1])
+            initials = str(c.childNodes[2])
+            contents = str(c.childNodes[3])
+            start_position = parse_start_position(context_before)
+            comments[user].append(
+                {
+                    'Thread':           '%008x' % random.randrange(16**8),
+                    'VerseRef':         verse_ref,
+                    'Date':             date,
+                    'SelectedText':     selected_text,
+                    'StartPosition':    start_position,
+                    'ContextBefore':    ' '.join(context_before),
+                    'ContextAfter':     ' '.join(context_after),
+                    'ConflictType':     'unknownConflictType',
+                    'Verse':            '',
+                    'HideInTextWindow': 'false',
+                    'Contents':         contents,
+                }
+            )
+            prev_comment = i
+
+            # Add content to doc_content.
+            chapter = int(verse_ref.split()[1].split(':')[0])
+            verse = int(verse_ref.split()[1].split(':')[1])
+            doc_content[chapter][verse].extend(pwords)
+
+        # Recurse into child nodes.
+        comment_count, comments, doc_content = append_comment(comment_count, comments, c, verse_ref, doc_content)
+
+    return comment_count, comments, doc_content
 
 def extract_comments(doc, book):
     doc_content = {0: {1: []}}
@@ -84,77 +169,8 @@ def extract_comments(doc, book):
             doc_content[chapter][verse] = []
 
         if has_comment(p):
-            # Get list of all comments in paragraph.
-            pcomments = []
-            for i, c in enumerate(p.childNodes):
-                if c.tagName == 'office:annotation':
-                    pcomments.append(i)
-                    comment_count += 1
-            pwords = []
-            context_before = []
-            context_after = []
-            prev_comment = 0
-            next_comment = -1
-            for i, c in enumerate(p.childNodes):
-                if c.tagName == 'office:annotation':
-                    # Determine indexes of prev and next comments.
-                    for j, k in enumerate(pcomments):
-                        if k == i:
-                            if len(pcomments) >= 1 + j + 1:
-                                next_comment = pcomments[j + 1]
-                            if j > 0:
-                                prev_comment = pcomments[j - 1]
-
-                    # Determine context before comment.
-                    context_before = []
-                    for n in p.childNodes[prev_comment:i]:
-                        context_before.extend(str(n).split())
-                    selected_text = ''
-
-                    # Determine end of comment selection.
-                    comment_end = i # if there's no selected text
-                    if len(p.childNodes) >= 1 + i + 2:
-                        if p.childNodes[i + 2].tagName == 'office:annotation-end':
-                            # Next child node has selected text.
-                            selected_text = str(p.childNodes[i + 1])
-                            comment_end = i + 2
-
-                    # Determine context after comment.
-                    context_after = []
-                    for n in p.childNodes[comment_end + 1:next_comment]:
-                        context_after.extend(str(n).split())
-
-                    # Set paragraph words according to context and selected text.
-                    pwords = context_before + selected_text.split() + context_after
-                    # print(context_after)
-                    user = str(c.childNodes[0])
-                    if comments.get(user) is None:
-                        comments[user] = []
-
-                    verse_ref = f"{book} {chapter}:{verse}"
-                    date = str(c.childNodes[1])
-                    initials = str(c.childNodes[2])
-                    contents = str(c.childNodes[3])
-                    start_position = parse_start_position(context_before)
-                    comments[user].append(
-                        {
-                            'Thread':           '%008x' % random.randrange(16**8),
-                            'VerseRef':         verse_ref,
-                            'Date':             date,
-                            'SelectedText':     selected_text,
-                            'StartPosition':    start_position,
-                            'ContextBefore':    ' '.join(context_before),
-                            'ContextAfter':     ' '.join(context_after),
-                            'ConflictType':     'unknownConflictType',
-                            'Verse':            '',
-                            'HideInTextWindow': 'false',
-                            'Contents':         contents,
-                        }
-                    )
-                    prev_comment = i
-
-            doc_content[chapter][verse].extend(pwords)
-
+            verse_ref = f"{book} {chapter}:{verse}"
+            comment_count, comments, doc_content = append_comment(comment_count, comments, p, verse_ref, doc_content)
         else:
             doc_content[chapter][verse].extend(ptext.split())
 
@@ -173,15 +189,14 @@ def main():
         for c in comments:
             c['Verse'] = ' '.join(get_verse_text(doc_content, c.get('VerseRef')))
 
-    # print(f"{comment_count} comments found by script.")
-    # print(f"406 comments found by grepping XML for 'office:annotation'")
-
     # Convert comments to Paratext XML.
     for user, comments in comments_dict.items():
         xml = xmlutils.build_notes_xml(user, comments)
         file_name = f"Notes_{user}.xml"
         outfile = infile.with_name(file_name)
         outfile.write_text(xml)
+
+    print(f"{comment_count} comments found and exported to {outfile.parents[0]}.")
 
 if __name__ == '__main__':
     main()
