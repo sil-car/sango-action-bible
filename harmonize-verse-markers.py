@@ -21,6 +21,7 @@ def get_info_dict(text):
         valid_lines = [
             '\p',
             '\id',
+            '\ip',
         ]
         if not text_info.get(ch):
             text_info[ch] = {
