@@ -15,23 +15,29 @@ from pathlib import Path as p
 
 def get_info_dict(text):
     text_info = {}
-    ch = None
+    ch = 0
     for i, line in enumerate(text.splitlines()):
-        if line[:2] == '\c':
-            try:
-                ch = int(line.split()[1])
-            except ValueError:
-                pass
+        start = line.split()[0]
+        valid_lines = [
+            '\p',
+            '\id',
+        ]
+        if not text_info.get(ch):
             text_info[ch] = {
                 'line-number': i,
                 'paragraph-count': 0,
                 'paragraphs': [],
                 'verses': {}
             }
-        if ch and line[:2] == '\p':
+        if start == '\c':
+            try:
+                ch = int(line.split()[1])
+            except ValueError:
+                pass
+        elif start in valid_lines:
             text_info[ch]['paragraph-count'] += 1
             text_info[ch]['paragraphs'].append(line)
-        if ch and line[:2] == '\\v':
+        elif start == '\\v':
             try:
                 vn = int(line.split()[1])
             except ValueError as e:
@@ -86,7 +92,8 @@ def get_total_paragraph_count(info):
 
 def print_output(info_dict):
     for ch, chdata in info_dict.items():
-        print(f"\c {ch}")
+        if ch != 0:
+            print(f"\c {ch}")
         for p in chdata.get('paragraphs'):
             print(p)
 
