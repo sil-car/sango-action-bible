@@ -32,27 +32,35 @@ def get_info_dict(text):
             text_info[ch]['paragraph-count'] += 1
             text_info[ch]['paragraphs'].append(line)
         if ch and line[:2] == '\\v':
-            vn = int(line.split()[1])
+            try:
+                vn = int(line.split()[1])
+            except ValueError as e:
+                print(e)
+                print(f"\c {ch}: {line}")
+                exit(1)
             text_info[ch]['verses'][vn] = text_info[ch]['paragraph-count'] - 1
+            text_info[ch]['paragraphs'][-1] = f"\p\n{line}"
     return text_info
 
 def add_verse_markers(binfo, tinfo):
-    output_lines_rev = []
     binfo_chs = [k for k in binfo.keys()]
     for bc in binfo_chs[::-1]:
-        bch_vns = [k for k in binfo.get(bc).get('verses').keys()]
-        for bvn in bch_vns[::-1]:
-            bpi = binfo.get(bc).get('verses').get(bvn)
-            # print(f"{bc}:{bvn}, {bpi}")
-            current_ptext = tinfo.get(bc).get('paragraphs')[bpi]
-            if bvn not in tinfo.get(bc).get('verses'):
-                # print(f"Insert verse {bv} at paragraph {bp + 1} of chapter {bc}")
-                line_no = tinfo.get(bc).get('line-number') + bpi + 1
-                new_ptext = f"\p\n\\v {bvn} {current_ptext[3:]}"
-                output_lines_rev.append(new_ptext)
-            else:
-                output_lines_rev.append(current_ptext)
-    return output_lines_rev
+        tps = tinfo.get(bc).get('paragraphs')
+        # print(tps)
+        tps = add_verse_markers_to_paragraphs(tps, binfo.get(bc).get('verses'))
+        # print(tps)
+        # print()
+        tinfo[bc]['paragraphs'] = tps
+    return tinfo
+
+def add_verse_markers_to_paragraphs(paragraphs, bverses):
+    for i, ptext in enumerate(paragraphs[:]):
+        for vn, vpi in bverses.items():
+            if i == vpi and ptext[:5] != f"\p\n\\v":
+                # print(f"\p\n\\v {vn} {ptext[3:]}")
+                paragraphs[i] = f"\p\n\\v {vn} {ptext[3:]}"
+                break
+    return paragraphs
 
 def verify_paragraph_count(binfo, tinfo):
     mismatched_paragraphs = {}
@@ -66,6 +74,7 @@ def verify_paragraph_count(binfo, tinfo):
             mismatched_paragraphs[bc] = {
                 'base': b_p_ct,
                 'target': t_p_ct,
+                'diff': b_p_ct - t_p_ct,
             }
     return mismatched_paragraphs
 
@@ -74,6 +83,12 @@ def get_total_paragraph_count(info):
     for values in info.values():
         pct += values.get('paragraph-count')
     return pct
+
+def print_output(info_dict):
+    for ch, chdata in info_dict.items():
+        print(f"\c {ch}")
+        for p in chdata.get('paragraphs'):
+            print(p)
 
 def main():
     # Parse arguments.
@@ -88,10 +103,16 @@ def main():
     # Read file contents.
     basetext = basefile.read_text()
     targettext = targetfile.read_text()
+    len_base = len(basetext.splitlines())
+    len_target = len(targettext.splitlines())
 
     # Gather needed info.
     baseinfo = get_info_dict(basetext)
+    # print(baseinfo)
+    # exit()
     targetinfo = get_info_dict(targettext)
+    # print(targetinfo)
+    # exit()
 
     # Check paragraph counts.
     mismatched_paragraphs = verify_paragraph_count(baseinfo, targetinfo)
@@ -100,18 +121,17 @@ def main():
         # for mp, values in mismatched_paragraphs.items():
         for mp in mp_rev[::-1]:
             v = mismatched_paragraphs.get(mp)
-            print(f"\c {mp}: base has {v.get('base')}, target has {v.get('target')}")
+            print(f"\c {mp:3}:\t\tdiff: {v.get('diff'):4}\tbase: {v.get('base'):5}\ttarget: {v.get('target'):5}")
         total_p_base = get_total_paragraph_count(baseinfo)
         total_p_target = get_total_paragraph_count(targetinfo)
         total_p_diff = total_p_base - total_p_target
-        print(f"Paragraph counts differ by {total_p_diff} (base: {total_p_base}, target: {total_p_target})")
+        print(f"Total ps:\tdiff: {total_p_diff:4}\tbase: {total_p_base:5}\ttarget: {total_p_target:5}")
+        print(f"Total lines:\tdiff: {len_base-len_target:4}\tbase: {len_base:5}\ttarget: {len_target:5}")
         exit(1)
 
     # Add verse markers into target file's info.
-    output_lines_rev = add_verse_markers(baseinfo, targetinfo)
-    # Print output lines in proper order.
-    for l in output_lines_rev[::-1]:
-        print(l)
+    targetinfo = add_verse_markers(baseinfo, targetinfo)
+    print_output(targetinfo)
 
 
 if __name__ == '__main__':
